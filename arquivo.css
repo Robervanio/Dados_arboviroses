@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dados de Dengue de Mauá - SP</title>
+  
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+    .card { box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: none; border-radius: 15px; transition: transform 0.2s; }
+    .card:hover { transform: translateY(-5px); }
+    .chart-container { position: relative; height: 380px; }
+    h1 { color: #2c3e50; font-weight: 700; }
+    .filter-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .stat-card { text-align: center; color: white; border-radius: 15px; padding: 20px; }
+    .upload-zone {
+      border: 3px dashed #ccc; border-radius: 15px; padding: 40px;
+      text-align: center; transition: all 0.3s; background: #f8f9fa;
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: #667eea; background: #e0eafc; }
+  </style>
+</head>
+<body class="pb-5">
+  <div class="container py-5">
+    <div class="text-center mb-5">
+      <h1 class="display-5">Dados de Dengue de Mauá - SP</h1>
+      <p class="lead text-muted">Dashboard Interativo • Atualização Automática via Excel</p>
+    </div>
+
+    <!-- Upload -->
+    <div class="card mb-4">
+      <div class="card-body text-center">
+        <div class="upload-zone" id="dropZone">
+          <i class="fas fa-file-excel fa-3x text-success mb-3"></i>
+          <h5>Clique ou arraste um arquivo .xlsx aqui</h5>
+          <input type="file" id="excelFile" accept=".xlsx,.xls" class="d-none">
+          <button class="btn btn-success mt-3" onclick="document.getElementById('excelFile').click()">
+            Selecionar Arquivo Excel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtros (4 filtros agora) -->
+    <div class="card filter-card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label fw-bold">Ano</label>
+            <select id="filterAno" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label fw-bold">UBS</label>
+            <select id="filterUBS" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-md-3 col-sm-6">
+            <label class="form-label fw-bold">Classificação</label>
+            <select id="filterClassificacao" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-md-2 col-sm-6">
+            <label class="form-label fw-bold">Território</label>
+            <select id="filterTerritorio" class="form-select form-select-lg"></select>
+          </div>
+          <div class="col-md-1 col-sm-12">
+            <button class="btn btn-light btn-lg w-100 h-100" onclick="resetFilters()" title="Limpar filtros">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estatísticas -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card" style="background: linear-gradient(135deg, #11998e, #38ef7d);">
+          <h2 class="display-5 fw-bold mb-0" id="totalCasos">0</h2>
+          <p class="mb-0 fs-5">Total de Casos</p>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card" style="background: linear-gradient(135deg, #fc4a1a, #f7b733);">
+          <h2 class="display-5 fw-bold mb-0" id="casosConfirmados">0</h2>
+          <p class="mb-0 fs-5">Casos Confirmados</p>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card" style="background: linear-gradient(135deg, #4568dc, #b06ab3);">
+          <h2 class="display-5 fw-bold mb-0" id="casosGraves">0</h2>
+          <p class="mb-0 fs-5">Casos Graves/Alerta</p>
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <div class="stat-card" style="background: linear-gradient(135deg, #ee0979, #ff6a00);">
+          <h2 class="display-5 fw-bold mb-0" id="taxaConfirmados">0%</h2>
+          <p class="mb-0 fs-5">% Confirmados</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" style="display:none;">
+      <div class="row g-4">
+        <div class="col-lg-6"><div class="card"><div class="card-header bg-primary text-white"><h5 class="mb-0">Casos por Ano</h5></div><div class="card-body"><div class="chart-container"><canvas id="chartAno"></canvas></div></div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-header bg-success text-white"><h5 class="mb-0">Evolução Temporal (Semana Epid.)</h5></div><div class="card-body"><div class="chart-container"><canvas id="chartTemporal"></canvas></div></div></div></div>
+        <div class="col-lg-4"><div class="card"><div class="card-header bg-info text-white"><h5 class="mb-0">Classificação Final</h5></div><div class="card-body"><canvas id="chartClassificacao"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card"><div class="card-header bg-warning text-dark"><h5 class="mb-0">Mês dos Sintomas</h5></div><div class="card-body"><canvas id="chartMes"></canvas></div></div></div>
+        <div class="col-lg-4"><div class="card"><div class="card-header bg-danger text-white"><h5 class="mb-0">Top 10 UBS</h5></div><div class="card-body"><canvas id="chartUBS"></canvas></div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-header bg-secondary text-white"><h5 class="mb-0">Casos por Território</h5></div><div class="card-body"><canvas id="chartTerritorio"></canvas></div></div></div>
+        <div class="col-lg-6"><div class="card"><div class="card-header bg-dark text-white"><h5 class="mb-0">Distribuição por Semana Epidemiológica</h5></div><div class="card-body"><canvas id="chartSemana"></canvas></div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let dados = [];
+    let charts = {};
+    const mesesOrdenados = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files.length) { document.getElementById('excelFile').files = e.dataTransfer.files; carregarExcel(); } });
+    dropZone.addEventListener('click', () => document.getElementById('excelFile').click());
+    document.getElementById('excelFile').addEventListener('change', carregarExcel);
+
+    function carregarExcel() {
+      const file = document.getElementById('excelFile').files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        dados = XLSX.utils.sheet_to_json(sheet);
+        popularFiltros();
+        atualizarTudo();
+        document.getElementById('dashboard').style.display = 'block';
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function popularFiltros() {
+      const anos = [...new Set(dados.map(r => r.ANO_SINT))].sort();
+      const ubs = [...new Set(dados.map(r => r.UBS_REFERÊNCIA))].sort();
+      const classificacoes = [...new Set(dados.map(r => r.Classificação).filter(Boolean))].sort();
+      const territorios = [...new Set(dados.map(r => r.TERRITÓRIO).filter(Boolean))].sort();
+
+      document.getElementById('filterAno').innerHTML = '<option value="">Todos os anos</option>' + anos.map(a => `<option value="${a}">${a}</option>`).join('');
+      document.getElementById('filterUBS').innerHTML = '<option value="">Todas as UBS</option>' + ubs.map(u => `<option value="${u}">${u}</option>`).join('');
+      document.getElementById('filterClassificacao').innerHTML = '<option value="">Todas as classificações</option>' + classificacoes.map(c => `<option value="${c}">${c}</option>`).join('');
+      document.getElementById('filterTerritorio').innerHTML = '<option value="">Todos os territórios</option>' + territorios.map(t => `<option value="${t}">${t}</option>`).join('');
+
+      const atualizar = atualizarTudo;
+      document.getElementById('filterAno').onchange = atualizar;
+      document.getElementById('filterUBS').onchange = atualizar;
+      document.getElementById('filterClassificacao').onchange = atualizar;
+      document.getElementById('filterTerritorio').onchange = atualizar;
+    }
+
+    function filtrarDados() {
+      const ano = document.getElementById('filterAno').value;
+      const ubs = document.getElementById('filterUBS').value;
+      const classificacao = document.getElementById('filterClassificacao').value;
+      const territorio = document.getElementById('filterTerritorio').value;
+
+      return dados.filter(r => {
+        return (!ano || r.ANO_SINT == ano) &&
+               (!ubs || r.UBS_REFERÊNCIA === ubs) &&
+               (!classificacao || r.Classificação === classificacao) &&
+               (!territorio || r.TERRITÓRIO === territorio);
+      });
+    }
+
+    function atualizarEstatisticas() {
+      const filtrados = filtrarDados();
+      const total = filtrados.length;
+      const confirmados = filtrados.filter(r => r.Classificação && r.Classificação.toLowerCase().includes('dengue')).length;
+      const graves = filtrados.filter(r => r.Classificação && (r.Classificação.includes('Grave') || r.Classificação.includes('alerta'))).length;
+      const taxa = total > 0 ? ((confirmados / total) * 100).toFixed(1) : 0;
+
+      document.getElementById('totalCasos').textContent = total.toLocaleString('pt-BR');
+      document.getElementById('casosConfirmados').textContent = confirmados.toLocaleString('pt-BR');
+      document.getElementById('casosGraves').textContent = graves.toLocaleString('pt-BR');
+      document.getElementById('taxaConfirmados').textContent = taxa + '%';
+    }
+
+    function atualizarGraficos() {
+      const dadosFiltrados = filtrarDados();
+
+      criarBarChart('chartAno', Object.entries(dadosFiltrados.reduce((a,r)=>(a[r.ANO_SINT]=(a[r.ANO_SINT]||0)+1,a),{})), 'Casos por Ano', '#4e79a7');
+      const tempData = dadosFiltrados.reduce((acc, r) => { const key = `${r.ANO_SINT}-W${String(r.SEM_PRI).padStart(2,'0')}`; acc[key] = (acc[key] || 0) + 1; return acc; }, {});
+      const labelsTemp = Object.keys(tempData).sort();
+      criarLineChart('chartTemporal', labelsTemp, Object.values(tempData), 'Evolução Semanal');
+      criarPieChart('chartClassificacao', Object.entries(dadosFiltrados.reduce((a,r)=>(a[r.Classificação]=(a[r.Classificação]||0)+1,a),{})));
+      criarBarChart('chartMes', mesesOrdenados.map(m => [m.toUpperCase(), dadosFiltrados.filter(r=>r.MÊS_SINT===m).length]), 'Casos por Mês', '#f28e2b');
+      const ubsCount = Object.entries(dadosFiltrados.reduce((a,r)=>(a[r.UBS_REFERÊNCIA]=(a[r.UBS_REFERÊNCIA]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      criarBarChart('chartUBS', ubsCount, 'Top 10 UBS', '#e15759');
+      criarDoughnutChart('chartTerritorio', Object.entries(dadosFiltrados.reduce((a,r)=>(a[r.TERRITÓRIO]=(a[r.TERRITÓRIO]||0)+1,a),{})));
+      criarBarChart('chartSemana', Object.entries(dadosFiltrados.reduce((a,r)=>(a[r.SEM_PRI]=(a[r.SEM_PRI]||0)+1,a),{})).sort((a,b)=>a[0]-b[0]), 'Casos por Semana', '#76b7b2');
+    }
+
+    function atualizarTudo() { atualizarEstatisticas(); atualizarGraficos(); }
+
+    function criarBarChart(id, dadosArray, titulo, cor = '#59a14f') {
+      destruirChart(id);
+      charts[id] = new Chart(document.getElementById(id), {
+        type: 'bar', data: { labels: dadosArray.map(d => d[0]), datasets: [{ label: titulo, data: dadosArray.map(d => d[1]), backgroundColor: cor }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+    }
+
+    function criarLineChart(id, labels, values, titulo) {
+      destruirChart(id);
+      charts[id] = new Chart(document.getElementById(id), {
+        type: 'line', data: { labels, datasets: [{ label: titulo, data: values, borderColor: '#4e79a7', backgroundColor: 'rgba(78,121,167,0.1)', fill: true, tension: 0.4 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { maxRotation: 45 } } } }
+      });
+    }
+
+    function criarPieChart(id, dadosArray) {
+      destruirChart(id);
+      const cores = ['#e15759','#f28e2b','#76b7b2','#59a14f','#edc948','#b07aa1','#ff9da7','#9c755f'];
+      charts[id] = new Chart(document.getElementById(id), { type: 'pie', data: { labels: dadosArray.map(d => d[0]), datasets: [{ data: dadosArray.map(d => d[1]), backgroundColor: cores }] }, options: { responsive: true, maintainAspectRatio: false } });
+    }
+
+    function criarDoughnutChart(id, dadosArray) {
+      destruirChart(id);
+      const cores = ['#4e79a7','#f28e2b','#e15759','#76b7b2','#59a14f','#edc948','#7f7f7f','#bcbd22'];
+      charts[id] = new Chart(document.getElementById(id), { type: 'doughnut', data: { labels: dadosArray.map(d => d[0]), datasets: [{ data: dadosArray.map(d => d[1]), backgroundColor: cores }] }, options: { responsive: true, maintainAspectRatio: false } });
+    }
+
+    function destruirChart(id) { if (charts[id]) { charts[id].destroy(); charts[id] = null; } }
+
+    function resetFilters() {
+      document.getElementById('filterAno').value = '';
+      document.getElementById('filterUBS').value = '';
+      document.getElementById('filterClassificacao').value = '';
+      document.getElementById('filterTerritorio').value = '';
+      atualizarTudo();
+    }
+  </script>
+</body>
+</html>
